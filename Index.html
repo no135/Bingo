@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Responsive Bingo Game</title>
+<style>
+  :root {
+    --cell-size: min(14vw, 60px);
+    --gold: #ffd700;
+    --red: #b30000;
+    --black: #1c1c1c;
+    --glow: 0 0 10px #ffd700, 0 0 20px #ff4500;
+  }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 1rem;
+    background: radial-gradient(ellipse at center, #1c1c1c 0%, #000000 100%);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .controls {
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .controls button {
+    padding: 0.6rem 1rem;
+    margin: 0.3rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    background: linear-gradient(145deg, var(--gold), #ff8c00);
+    color: #000;
+    box-shadow: var(--glow);
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+  }
+
+  .controls button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px 5px #fff700;
+  }
+
+  .called-info {
+    margin-top: 0.5rem;
+    font-size: 1rem;
+    max-width: 90vw;
+    background-color: #333;
+    padding: 0.5rem;
+    border-radius: 10px;
+    border: 2px solid var(--gold);
+    box-shadow: inset 0 0 10px #fff700;
+  }
+
+  .game-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem;
+    width: 100%;
+    max-width: 1000px;
+  }
+
+  .all-numbers {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .column-label {
+    text-align: center;
+    font-weight: bold;
+    color: var(--gold);
+    text-shadow: var(--glow);
+    margin-bottom: 5px;
+  }
+
+  .column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .num-cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    background: linear-gradient(to top left, #222, #444);
+    border: 1px solid #999;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border-radius: 5px;
+    box-shadow: inset 0 0 10px #000;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+  }
+
+  .num-cell.marked {
+    background: radial-gradient(circle at center, #32cd32, #006400);
+    color: #fff;
+    box-shadow: 0 0 10px 3px #00ff00;
+    transform: scale(1.05);
+  }
+
+  table {
+    border-collapse: collapse;
+    background: linear-gradient(#222, #111);
+    border: 3px solid var(--gold);
+    box-shadow: 0 0 20px #ff8c00;
+  }
+
+  th, td {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    border: 1px solid #666;
+    text-align: center;
+    font-size: 1rem;
+    color: white;
+    background-color: #1e1e1e;
+    box-shadow: inset 0 0 5px #000;
+    transition: all 0.3s ease;
+  }
+
+  th {
+    background: linear-gradient(to bottom, var(--gold), #ff8c00);
+    color: black;
+    text-shadow: none;
+  }
+
+  .free {
+    background: repeating-linear-gradient(45deg, #999, #999 10px, #bbb 10px, #bbb 20px);
+    font-weight: bold;
+    color: #000;
+  }
+
+  .marked,
+  td.marked {
+    background: radial-gradient(circle at center, #32cd32, #006400) !important;
+    color: #fff !important;
+    box-shadow: 0 0 10px 3px #00ff00;
+    transform: scale(1.05);
+    font-weight: bold;
+    border: 1px solid #00ff00;
+  }
+
+  @media (max-width: 600px) {
+    th, td, .num-cell { font-size: 0.8rem; }
+    .controls button { font-size: 0.9rem; padding: 0.5rem 0.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <button onclick="generateTicket()">Generate Ticket</button>
+  <button onclick="callNumber()">Call Number</button>
+  <button onclick="startAutoCall()">Start Auto-Call</button>
+  <button onclick="stopAutoCall()">Stop Auto-Call</button>
+  <div class="called-info">
+    <strong>Called Numbers:</strong> <span id="calledList"></span>
+  </div>
+</div>
+
+<div class="game-container">
+  <div class="all-numbers" id="numberGrid"></div>
+  <table id="bingoTable">
+    <thead><tr><th>B</th><th>I</th><th>N</th><th>G</th><th>O</th></tr></thead>
+    <tbody>
+      <tr><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td></td><td></td><td class="free">FREE</td><td></td><td></td></tr>
+      <tr><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td></td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  const columns = {
+    B: { range: [1, 15], values: [], index: 0 },
+    I: { range: [16, 30], values: [], index: 0 },
+    N: { range: [31, 45], values: [], index: 0 },
+    G: { range: [46, 60], values: [], index: 0 },
+    O: { range: [61, 75], values: [], index: 0 },
+  };
+  const columnOrder = ['B', 'I', 'N', 'G', 'O'];
+  let currentColumnIndex = 0;
+  let ticketNumbers = Array.from({ length: 5 }, () => Array(5).fill(null));
+  let calledNumbers = new Set();
+  let autoCallInterval = null;
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function generateAllNumbersGrid() {
+    const grid = document.getElementById('numberGrid');
+    grid.innerHTML = '';
+    for (const col of columnOrder) {
+      const colDiv = document.createElement('div');
+      colDiv.classList.add('column');
+      const label = document.createElement('div');
+      label.classList.add('column-label');
+      label.textContent = col;
+      colDiv.appendChild(label);
+      const [start, end] = columns[col].range;
+      columns[col].values = shuffle(Array.from({ length: end - start + 1 }, (_, i) => i + start));
+      columns[col].index = 0;
+      for (let num = start; num <= end; num++) {
+        const cell = document.createElement('div');
+        cell.className = 'num-cell';
+        cell.id = `num-${num}`;
+        cell.textContent = num;
+        colDiv.appendChild(cell);
+      }
+      grid.appendChild(colDiv);
+    }
+  }
+
+  function generateTicket() {
+    const table = document.getElementById('bingoTable');
+    calledNumbers.clear();
+    document.getElementById("calledList").textContent = '';
+    generateAllNumbersGrid();
+    currentColumnIndex = 0;
+    const ranges = [[1, 15], [16, 30], [31,45], [46, 60], [61, 75]];
+    for (let col = 0; col < 5; col++) {
+      const nums = shuffle(Array.from({ length: ranges[col][1] - ranges[col][0] + 1 }, (_, i) => i + ranges[col][0]));
+      let count = col === 2 ? 4 : 5;
+      for (let row = 0, i = 0; row < 5; row++) {
+        if (col === 2 && row === 2) {
+          ticketNumbers[row][col] = 'FREE';
+          continue;
+        }
+        const num = nums[i++];
+        ticketNumbers[row][col] = num;
+        const cell = table.rows[row + 1].cells[col];
+        cell.textContent = num;
+        cell.className = '';
+      }
+    }
+  }
+
+  function callNumber() {
+    if (calledNumbers.size >= 75) return alert("All numbers have been called.");
+    let nextNum = null;
+    let attempts = 0;
+    while (attempts < 5 && !nextNum) {
+      const colKey = columnOrder[currentColumnIndex];
+      const colData = columns[colKey];
+      const remaining = colData.values.filter(n => !calledNumbers.has(n));
+      if (remaining.length > 0) {
+        nextNum = remaining[Math.floor(Math.random() * remaining.length)];
+        calledNumbers.add(nextNum);
+      }
+      currentColumnIndex = (currentColumnIndex + 1) % 5;
+      attempts++;
+    }
+    if (!nextNum) return;
+
+    document.getElementById("calledList").textContent = Array.from(calledNumbers).sort((a, b) => a - b).join(", ");
+    
+    const gridCell = document.getElementById(`num-${nextNum}`);
+    if (gridCell) gridCell.classList.add("marked");
+
+    const table = document.getElementById('bingoTable');
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 5; col++) {
+        if (ticketNumbers[row][col] === nextNum) {
+          table.rows[row + 1].cells[col].classList.add("marked");
+        }
+      }
+    }
+
+    checkWin();
+  }
+
+  function startAutoCall() {
+    if (autoCallInterval) return;
+    autoCallInterval = setInterval(() => {
+      callNumber();
+      if (calledNumbers.size >= 75) stopAutoCall();
+    }, 2000);
+  }
+
+  function stopAutoCall() {
+    clearInterval(autoCallInterval);
+    autoCallInterval = null;
+  }
+
+  function isMarked(row, col) {
+    if (row === 2 && col === 2) return true;
+    return document.getElementById('bingoTable').rows[row + 1].cells[col].classList.contains("marked");
+  }
+
+  function checkPattern(positions) {
+    return positions.every(([r, c]) => isMarked(r, c));
+  }
+
+  function checkWin() {
+    const patterns = {
+      "Top Row + Diagonal": [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 0], [1, 1], [2, 2], [3, 3], [4, 4]],
+      "Bottom Row + Diagonal": [[4, 0], [4, 1], [4, 2], [4, 3], [4, 4], [0, 0], [1, 1], [2, 2], [3, 3], [4, 4]],
+      "Middle Row + Diagonal": [[2, 0], [2, 1], [2, 2], [2, 3], [2, 4], [0, 0], [1, 1], [2, 2], [3, 3], [4, 4]],
+      "L Shape": [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [4, 1], [4, 2], [4, 3], [4, 4]],
+      "T Shape": [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [1, 2], [2, 2], [3, 2], [4, 2]],
+      "X (Diagonals)": [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [0, 4], [1, 3], [3, 1], [4, 0]],
+      "3 Middle Rows + Diagonal": [
+        [1, 0], [1, 1], [1, 2], [1, 3], [1, 4],
+        [2, 0], [2, 1], [2, 2], [2, 3], [2, 4],
+        [3, 0], [3, 1], [3, 2], [3, 3], [3, 4],
+        [0, 0], [1, 1], [2, 2], [3, 3], [4, 4]
+      ],
+      "Diagonal with B Column": [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [0, 0], [1, 0], [2, 0], [3, 0], [4, 0]],
+      "Diagonal with I Column": [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [0, 0], [1, 1], [2, 2], [3, 3], [4, 4]],
+      "Diagonal with N Column": [[0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [0, 0], [1, 1], [2, 2], [3, 3], [4, 4]]
+    };
+
+    for (const [name, positions] of Object.entries(patterns)) {
+      if (checkPattern(positions)) {
+        alert(`You won with pattern: ${name}!`);
+        stopAutoCall();
+        return;
+      }
+    }
+  }
+
+  window.onload = () => {
+    generateTicket();
+  };
+</script>
+</body>
+  </html>
